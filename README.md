@@ -1,3 +1,9 @@
+---
+title: CloudCostAnomalyHunter
+sdk: docker
+short_description: OpenEnv-style FinOps benchmark
+---
+
 # Cloud Cost Anomaly Hunter
 
 Cloud Cost Anomaly Hunter is an OpenEnv-style FinOps benchmark environment. It simulates NovaTech Inc., a multi-cloud company where an agent investigates cloud billing data, infrastructure metadata, and SaaS license usage to detect waste and recommend remediations.
