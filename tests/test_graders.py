@@ -15,7 +15,7 @@ def test_task1_deterministic_score() -> None:
             }
         )
     _, _, _, info = env.step({"action_type": "submit_report"})
-    assert info["final_score"] == 1.0
+    assert 0.99 <= info["final_score"] < 1.0
 
 
 def test_task2_deterministic_score() -> None:
@@ -30,7 +30,7 @@ def test_task2_deterministic_score() -> None:
         }
     )
     _, _, _, info = env.step({"action_type": "submit_report"})
-    assert info["final_score"] == 1.0
+    assert 0.99 <= info["final_score"] < 1.0
 
 
 def test_task3_deterministic_score() -> None:
@@ -48,4 +48,4 @@ def test_task3_deterministic_score() -> None:
         )
     env._state["report"]["remediation_quality_bonus"] = 0.1
     _, _, _, info = env.step({"action_type": "submit_report"})
-    assert round(info["final_score"], 6) == 1.0
+    assert 0.99 <= info["final_score"] < 1.0

@@ -4,6 +4,9 @@ from datetime import date
 from typing import Any, Dict
 
 
+_EPS = 1e-3
+
+
 def _within_days(a: str, b: str, days: int) -> bool:
     da = date.fromisoformat(a)
     db = date.fromisoformat(b)
@@ -31,4 +34,4 @@ def grade(submission: Dict[str, Any], labels: Dict[str, Any]) -> float:
     if score >= 1.0:
         score += 0.1
 
-    return max(0.0, min(1.0, score))
+    return min(1.0 - _EPS, max(_EPS, score))

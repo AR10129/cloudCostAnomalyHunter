@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
+_EPS = 1e-3
+
+
 def grade(submission: Dict[str, Any], labels: Dict[str, Any]) -> float:
     flagged = submission.get("flags", [])
     flagged_ids = {f.get("resource_id") for f in flagged}
@@ -20,4 +23,4 @@ def grade(submission: Dict[str, Any], labels: Dict[str, Any]) -> float:
         score = 0.3
 
     score -= 0.1 * fp
-    return max(0.0, min(1.0, score))
+    return min(1.0 - _EPS, max(_EPS, score))

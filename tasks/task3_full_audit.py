@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
+_EPS = 1e-3
+
+
 def grade(submission: Dict[str, Any], labels: Dict[str, Any]) -> float:
     flags = submission.get("flags", [])
     remediation_bonus = float(submission.get("report", {}).get("remediation_quality_bonus", 0.0))
@@ -29,4 +32,4 @@ def grade(submission: Dict[str, Any], labels: Dict[str, Any]) -> float:
     raw -= min(0.25, 0.05 * false_positive)
     raw += min(0.10, max(0.0, remediation_bonus))
 
-    return max(0.0, min(1.0, raw))
+    return min(1.0 - _EPS, max(_EPS, raw))

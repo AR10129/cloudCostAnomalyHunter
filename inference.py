@@ -10,6 +10,9 @@ try:
     from openai import OpenAI
 except Exception:  # pragma: no cover
     OpenAI = None  # type: ignore
+
+
+_EPS = 1e-3
  
  
 def log_start(task: str, env: str, model: str) -> None:
@@ -28,7 +31,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_text = ",".join(f"{r:.2f}" for r in rewards)
     print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_text}",
+        f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_text}",
         flush=True,
     )
  
@@ -226,7 +229,7 @@ def run_task(task_name: str, benchmark: str, client: Any, model_name: str) -> fl
             _, _, _, info = env.step({"action_type": "submit_report"})
             score = float(info.get("final_score", 0.0))
  
-        score = max(0.0, min(1.0, score))
+        score = min(1.0 - _EPS, max(_EPS, score))
         success = score > 0.0
         return score
     finally:
