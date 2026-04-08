@@ -40,103 +40,6 @@ def _safe_action_text(action: Dict[str, Any]) -> str:
     return json.dumps(action, separators=(",", ":"), ensure_ascii=True)
 
 
-def _detect_spike(env: CloudCostEnv) -> Dict[str, Any]:
-    by_resource: Dict[str, List[float]] = {}
-    by_service: Dict[str, str] = {}
-    by_dates: Dict[str, List[Tuple[str, float]]] = {}
-
-    for row in env._state["billing_rows"]:
-        rid = row["resource_id"]
-        by_resource.setdefault(rid, []).append(float(row["cost_usd"]))
-        by_service[rid] = row["service"]
-        by_dates.setdefault(rid, []).append((row["date"], float(row["cost_usd"])))
-
-    best = {"resource_id": "", "service": "", "spike_start_date": "", "ratio": 0.0}
-    for rid, values in by_resource.items():
-        if len(values) < 40:
-            continue
-        baseline = sum(values[:120]) / max(1, len(values[:120]))
-        peak = max(values)
-        ratio = peak / baseline if baseline > 0 else 0.0
-        if ratio > best["ratio"]:
-            date, _ = max(by_dates[rid], key=lambda x: x[1])
-            best = {
-                "resource_id": rid,
-                "service": by_service[rid],
-                "spike_start_date": date,
-                "ratio": ratio,
-            }
-    return best
-
-
-def _heuristic_action(task_name: str, env: CloudCostEnv) -> Dict[str, Any]:
-    if task_name == "task1_zombie":
-        already = {f["resource_id"] for f in env._state["flags"]}
-        for row in env._state["infra_snapshot"]:
-            if row["resource_id"] in already:
-                continue
-            if row["utilization_cpu_pct"] < 2 and row["inbound_traffic_mb"] < 1 and row["io_ops"] < 1:
-                return {
-                    "action_type": "flag_anomaly",
-                    "resource_id": row["resource_id"],
-                    "anomaly_type": "zombie",
-                    "severity": "high",
-                    "reasoning": "resource has near-zero utilization and no traffic",
-                }
-        return {"action_type": "submit_report"}
-
-    if task_name == "task2_spike_rca":
-        spike = _detect_spike(env)
-        cause_by_service = {
-            "EC2": "misconfigured_autoscale",
-            "Lambda": "invocation_storm",
-            "S3": "egress_surge",
-            "RDS": "iops_burst",
-        }
-        if not env._state["flags"]:
-            env._state["report"].update(
-                {
-                    "spike_start_date": spike["spike_start_date"],
-                    "service": spike["service"],
-                    "root_cause_category": cause_by_service.get(spike["service"], "misconfigured_autoscale"),
-                    "estimated_saving_usd": 880.0,
-                }
-            )
-            return {
-                "action_type": "flag_anomaly",
-                "resource_id": spike["resource_id"],
-                "anomaly_type": "cost_spike",
-                "severity": "critical",
-                "reasoning": "spend sharply deviates from baseline",
-                "root_cause_category": cause_by_service.get(spike["service"], "misconfigured_autoscale"),
-                "service": spike["service"],
-                "spike_start_date": spike["spike_start_date"],
-            }
-        if not env._state["recommendations"]:
-            return {
-                "action_type": "recommend_action",
-                "resource_id": spike["resource_id"],
-                "action_type_detail": "cap_autoscale",
-                "estimated_saving_usd": 880.0,
-            }
-        return {"action_type": "submit_report"}
-
-    anomalies = env._state["labels"]["anomalies"]
-    flagged = {f["resource_id"] for f in env._state["flags"]}
-    for anomaly_type, payload in anomalies.items():
-        if payload["resource_id"] not in flagged:
-            return {
-                "action_type": "flag_anomaly",
-                "resource_id": payload["resource_id"],
-                "anomaly_type": anomaly_type,
-                "severity": payload["severity"],
-                "reasoning": "matched anomaly pattern during audit",
-            }
-
-    env._state["report"]["remediation_quality_bonus"] = 0.1
-    return {"action_type": "submit_report"}
-
-
 def _llm_action(
     client: Any,
     model_name: str,
@@ -188,19 +91,29 @@ def run_task(task_name: str, benchmark: str, client: Any, model_name: str) -> fl
     try:
         for _ in range(env.max_steps):
             action: Dict[str, Any]
-            if client is None:
-                action = _heuristic_action(task_name, env)
-            else:
-                try:
-                    action = _llm_action(
-                        client=client,
-                        model_name=model_name,
-                        task_name=task_name,
-                        observation=obs.model_dump(),
-                        state_snapshot=env.state(),
-                    )
-                except Exception:
-                    action = _heuristic_action(task_name, env)
+            try:
+                action = _llm_action(
+                    client=client,
+                    model_name=model_name,
+                    task_name=task_name,
+                    observation=obs.model_dump(),
+                    state_snapshot=env.state(),
+                )
+            except Exception as exc:
+                llm_error = str(exc).replace("\n", " ").strip() or "llm_call_failed"
+                action = {"action_type": "submit_report"}
+                obs, reward, done, info = env.step(action)
+                rewards.append(float(reward))
+                steps_taken = obs.step
+                log_step(
+                    step=obs.step,
+                    action=_safe_action_text(action),
+                    reward=float(reward),
+                    done=bool(done),
+                    error=llm_error,
+                )
+                score = float(info.get("final_score", 0.0))
+                break
 
             obs, reward, done, info = env.step(action)
             rewards.append(float(reward))
@@ -248,9 +161,12 @@ def main() -> None:
     _local_image_name = os.getenv("LOCAL_IMAGE_NAME")
     benchmark = os.getenv("OPENENV_BENCHMARK", "cloud-cost-anomaly-hunter")
 
-    client = None
-    if OpenAI is not None and hf_token:
-        client = OpenAI(base_url=api_base_url, api_key=hf_token)
+    if OpenAI is None:
+        raise RuntimeError("openai package is required for inference.py")
+    if not hf_token:
+        raise RuntimeError("HF_TOKEN is required for submission inference")
+
+    client = OpenAI(base_url=api_base_url, api_key=hf_token)
 
     tasks = ["task1_zombie", "task2_spike_rca", "task3_full_audit"]
     results: List[Tuple[str, float]] = []
