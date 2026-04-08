@@ -1,0 +1,20 @@
+name: cloud-cost-anomaly-hunter
+version: 1.0.0
+domain: finops
+tags:
+  - openenv
+  - finops
+  - cloud
+  - security
+  - anomaly-detection
+tasks:
+  - zombie_detection
+  - spike_rca
+  - full_audit
+observation_type: structured_json
+action_type: function_call
+reward_range:
+  - -0.25
+  - 1.1
+max_steps: 40
+validated: true

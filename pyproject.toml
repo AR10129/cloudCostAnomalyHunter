@@ -1,0 +1,17 @@
+[project]
+name = "cloud-cost-anomaly-hunter"
+version = "1.0.0"
+description = "OpenEnv FinOps benchmark for cloud cost anomaly detection"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "OpenEnv Participant" }]
+dependencies = [
+	"openenv-core>=0.2.0",
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

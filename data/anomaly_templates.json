@@ -1,0 +1,32 @@
+{
+  "zombie": {
+    "description": "Resource with very low utilization and no meaningful activity",
+    "thresholds": {
+      "cpu_pct_lt": 2,
+      "inbound_traffic_mb_lt": 1,
+      "io_ops_lt": 1,
+      "inactive_days_gt": 30
+    }
+  },
+  "cost_spike": {
+    "description": "Sustained 3-5x spend increase over baseline",
+    "window_days": 10,
+    "multiplier_range": [3, 5]
+  },
+  "overprovisioned_rds": {
+    "description": "High-cost RDS under low utilization",
+    "thresholds": {
+      "cpu_pct_lt": 10,
+      "daily_cost_gt": 35
+    }
+  },
+  "unused_saas_seats": {
+    "description": "Large gap between purchased and active seats",
+    "thresholds": {
+      "utilization_ratio_lt": 0.75
+    }
+  },
+  "cross_region_waste": {
+    "description": "Data transfer and storage misalignment across regions"
+  }
+}
