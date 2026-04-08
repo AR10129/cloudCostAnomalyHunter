@@ -136,7 +136,7 @@ def generate_task3(seed: int = 7) -> Dict[str, Any]:
 
     for r in resources:
         if r["resource_id"] == "res-003":
-            r["utilization_cpu_pct"] = 0.4
+            r["utilization_cpu_pct"] = 0.3
             r["inbound_traffic_mb"] = 0.0
             r["io_ops"] = 0
             r["last_accessed"] = "2025-02-01"

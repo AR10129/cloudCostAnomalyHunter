@@ -169,6 +169,18 @@ class CloudCostEnv:
             root_cause_category=action.get("root_cause_category"),
         )
         self._state["flags"].append(flag.model_dump())
+
+        # Task 2 grader reads from report; populate fields from actions when provided.
+        if self._state["task"] == "task2_spike_rca":
+            report = self._state["report"]
+            if action.get("spike_start_date"):
+                report["spike_start_date"] = action["spike_start_date"]
+            if action.get("service"):
+                report["service"] = action["service"]
+            if action.get("root_cause_category"):
+                report["root_cause_category"] = action["root_cause_category"]
+            self._state["report"] = report
+
         return {"flag": flag.model_dump()}
 
     def _recommend_action(self, action: Dict[str, Any]) -> Dict[str, Any]:

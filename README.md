@@ -2,6 +2,11 @@
 title: CloudCostAnomalyHunter
 sdk: docker
 short_description: OpenEnv-style FinOps benchmark
+tags:
+	- openenv
+	- finops
+	- llm-eval
+	- agent-benchmark
 ---
 
 # Cloud Cost Anomaly Hunter
@@ -95,6 +100,7 @@ docker run --rm -p 7860:7860 cloud-cost-anomaly-hunter
 ## Running the Inference Script
 
 Submission entrypoint is `inference.py` at repo root.
+This is the OpenEnv submission script expected by validators.
 
 Required variables:
 
@@ -114,6 +120,9 @@ python inference.py
 The script emits structured stdout logs using `[START]`, `[STEP]`, and `[END]` records.
 
 ## Running the Baseline
+
+`baseline/run_baseline.py` is a local heuristic smoke script for reproducibility checks.
+It is not the official OpenEnv submission entrypoint.
 
 ```bash
 export OPENAI_API_KEY=your_key_here
