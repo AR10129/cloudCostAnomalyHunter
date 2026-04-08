@@ -40,6 +40,75 @@ def _safe_action_text(action: Dict[str, Any]) -> str:
     return json.dumps(action, separators=(",", ":"), ensure_ascii=True)
 
 
+def _known_resource_id(env: CloudCostEnv, observation: Any) -> str:
+    recent = observation.recent_query_results or []
+    if recent and isinstance(recent, list) and recent[0].get("resource_id"):
+        return str(recent[0]["resource_id"])
+
+    infra = env._state.get("infra_snapshot", [])
+    if infra:
+        return str(infra[0].get("resource_id", ""))
+    return ""
+
+
+def _normalize_action(action: Dict[str, Any], env: CloudCostEnv, observation: Any) -> Dict[str, Any]:
+    action_type = str(action.get("action_type", "submit_report"))
+
+    if action_type == "query_billing":
+        filt = action.get("filter")
+        if not isinstance(filt, dict):
+            filt = {}
+        return {"action_type": "query_billing", "filter": filt}
+
+    if action_type == "query_infra":
+        rid = action.get("resource_id")
+        if not isinstance(rid, str) or not rid:
+            rid = _known_resource_id(env, observation)
+        if not rid:
+            return {"action_type": "query_billing", "filter": {}}
+        return {"action_type": "query_infra", "resource_id": rid}
+
+    if action_type == "flag_anomaly":
+        rid = action.get("resource_id")
+        if not isinstance(rid, str) or not rid:
+            rid = _known_resource_id(env, observation)
+        if not rid:
+            return {"action_type": "query_billing", "filter": {}}
+        return {
+            "action_type": "flag_anomaly",
+            "resource_id": rid,
+            "anomaly_type": str(action.get("anomaly_type", "unknown")),
+            "severity": str(action.get("severity", "medium")),
+            "reasoning": str(action.get("reasoning", "model_inferred_anomaly")),
+            "root_cause_category": action.get("root_cause_category"),
+            "service": action.get("service"),
+            "spike_start_date": action.get("spike_start_date"),
+        }
+
+    if action_type == "recommend_action":
+        rid = action.get("resource_id")
+        if not isinstance(rid, str) or not rid:
+            rid = _known_resource_id(env, observation)
+        if not rid:
+            return {"action_type": "query_billing", "filter": {}}
+        est = action.get("estimated_saving_usd", 0.0)
+        try:
+            est = float(est)
+        except Exception:
+            est = 0.0
+        return {
+            "action_type": "recommend_action",
+            "resource_id": rid,
+            "action_type_detail": str(action.get("action_type_detail", "investigate")),
+            "estimated_saving_usd": est,
+        }
+
+    if action_type == "write_note":
+        return {"action_type": "write_note", "content": str(action.get("content", ""))}
+
+    return {"action_type": "submit_report"}
+
+
 def _llm_action(
     client: Any,
     model_name: str,
@@ -92,13 +161,14 @@ def run_task(task_name: str, benchmark: str, client: Any, model_name: str) -> fl
         for _ in range(env.max_steps):
             action: Dict[str, Any]
             try:
-                action = _llm_action(
+                raw_action = _llm_action(
                     client=client,
                     model_name=model_name,
                     task_name=task_name,
                     observation=obs.model_dump(),
                     state_snapshot=env.state(),
                 )
+                action = _normalize_action(raw_action, env, obs)
             except Exception as exc:
                 llm_error = str(exc).replace("\n", " ").strip() or "llm_call_failed"
                 action = {"action_type": "submit_report"}
@@ -156,7 +226,7 @@ def run_task(task_name: str, benchmark: str, client: Any, model_name: str) -> fl
 
 def main() -> None:
     api_base_url = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-    model_name = os.getenv("MODEL_NAME", "gpt-4o")
+    model_name = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
     hf_token = os.getenv("HF_TOKEN")
     _local_image_name = os.getenv("LOCAL_IMAGE_NAME")
     benchmark = os.getenv("OPENENV_BENCHMARK", "cloud-cost-anomaly-hunter")
