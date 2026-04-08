@@ -3,10 +3,10 @@ title: CloudCostAnomalyHunter
 sdk: docker
 short_description: OpenEnv-style FinOps benchmark
 tags:
-	- openenv
-	- finops
-	- llm-eval
-	- agent-benchmark
+  - openenv
+  - finops
+  - llm-eval
+  - agent-benchmark
 ---
 
 # Cloud Cost Anomaly Hunter
