@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 from typing import Any, Dict, Optional
 
@@ -62,3 +63,12 @@ def step(req: StepRequest) -> Dict[str, Any]:
 def state(session_id: str = "default") -> Dict[str, Any]:
     env = _get_or_create_env(session_id)
     return env.state()
+
+
+@app.get("/debug/env")
+def debug_env() -> Dict[str, Any]:
+    return {
+        "has_api_base_url": bool(os.getenv("API_BASE_URL")),
+        "has_model_name": bool(os.getenv("MODEL_NAME")),
+        "has_hf_token": bool(os.getenv("HF_TOKEN")),
+    }
