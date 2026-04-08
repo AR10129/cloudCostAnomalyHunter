@@ -22,6 +22,7 @@ def _get_or_create_env(session_id: str) -> CloudCostEnv:
 
 
 class ResetRequest(BaseModel):
+    msg: Optional[str] = None
     session_id: Optional[str] = None
     task_name: Optional[str] = None
     seed: Optional[int] = None
@@ -38,7 +39,8 @@ def root() -> Dict[str, Any]:
 
 
 @app.post("/reset")
-def reset(req: ResetRequest) -> Dict[str, Any]:
+def reset(req: Optional[ResetRequest] = None) -> Dict[str, Any]:
+    req = req or ResetRequest()
     session_id = req.session_id or "default"
     env = _get_or_create_env(session_id)
     obs = env.reset(task_name=req.task_name, seed=req.seed)
